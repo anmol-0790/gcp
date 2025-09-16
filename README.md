@@ -1,6 +1,6 @@
 # GCP React Modules Deployment
 
-This project contains two separate React modules that can be deployed independently to Google Cloud Platform (GCP) Compute Engine, each on its own VM.
+This project contains two React modules that can be deployed to Google Cloud Platform (GCP) Compute Engine on the same VM with path-based routing.
 
 ## Project Structure
 
@@ -38,9 +38,8 @@ gcp/
 │   ├── Dockerfile
 │   ├── nginx.conf
 │   └── .dockerignore
-├── deploy-unified.sh        # Deploy both modules on one VM (legacy)
-├── deploy-login.sh          # Deploy Login Module to its own VM
-├── deploy-dashboard.sh      # Deploy Dashboard Module to its own VM
+├── deploy-login.sh          # Deploy Login Module to shared VM
+├── deploy-dashboard.sh      # Deploy Dashboard Module to shared VM
 └── README.md
 ```
 
@@ -91,68 +90,44 @@ ZONE="us-central1-a"                     # Your preferred zone
 
 ### 3. Deploy to GCP
 
-#### Deploy Individual Modules (RECOMMENDED) 🎯
+#### Deploy Modules to Shared VM 🎯
 
-Deploy each module to its own VM:
+Deploy modules to the same VM with path-based routing:
 
 ```bash
-# Deploy Login Module to its own VM
+# Deploy Login Module first
 ./deploy-login.sh
 
-# Deploy Dashboard Module to its own VM
+# Deploy Dashboard Module (uses same VM)
 ./deploy-dashboard.sh
-```
-
-#### Deploy Both Modules (Legacy) 🚀
-
-Deploy both modules on one VM with path routing:
-
-```bash
-# Deploy both modules on one VM
-./deploy-unified.sh
 ```
 
 **Access URLs:**
 
-**Login Module:**
-
-- Login: `http://LOGIN_VM_IP/`
-- Health Check: `http://LOGIN_VM_IP/health`
-
-**Dashboard Module:**
-
-- Dashboard: `http://DASHBOARD_VM_IP/`
-- Health Check: `http://DASHBOARD_VM_IP/health`
+- **Login Module**: `http://VM_IP/login/`
+- **Dashboard Module**: `http://VM_IP/dashboard/`
+- **Health Check**: `http://VM_IP/health`
+- **Root**: `http://VM_IP/` (redirects based on last deployed module)
 
 ## What the Scripts Do
-
-### `deploy-unified.sh` - Deploy Both Modules
-
-1. **Builds** both React applications locally
-2. **Creates** a GCP Compute Engine VM instance
-3. **Installs** Nginx on the VM
-4. **Copies** both built React files to the VM
-5. **Configures** Nginx for path-based routing
-6. **Sets up** proper file permissions
-7. **Provides** working URLs for both modules
 
 ### `deploy-login.sh` - Deploy Login Module
 
 1. **Builds** the Login React application locally
-2. **Creates** a dedicated VM for Login module
-3. **Installs** Nginx on the VM
-4. **Copies** Login built files to `/var/www/html/`
-5. **Configures** Nginx to serve from root directory
+2. **Creates** VM if it doesn't exist, or uses existing VM
+3. **Installs** Nginx if needed
+4. **Copies** Login built files to `/var/www/html/login/`
+5. **Configures** Nginx for `/login/` path routing
 6. **Sets up** proper file permissions
 7. **Provides** working URL for Login module
 
 ### `deploy-dashboard.sh` - Deploy Dashboard Module
 
 1. **Builds** the Dashboard React application locally
-2. **Creates** a dedicated VM for Dashboard module
-3. **Installs** Nginx on the VM
-4. **Copies** Dashboard built files to `/var/www/html/`
-5. **Configures** Nginx to serve from root directory
+2. **Uses** existing VM (same as login)
+3. **Installs** Nginx if needed
+4. **Copies** Dashboard built files to `/var/www/html/dashboard/`
+5. **Configures** Nginx for `/dashboard/` path routing
 6. **Sets up** proper file permissions
 7. **Provides** working URL for Dashboard module
 
@@ -218,31 +193,31 @@ docker run -p 3002:80 dashboard-module:latest
 6. **Copies files** to VM via `gcloud compute scp`
 7. **Provides unified access URLs**
 
-### Individual Deployments
+### Shared VM Benefits
 
-- Each module gets its own VM
-- Direct access via external IP
-- Independent scaling and management
-- Serves from root path (no subdirectory routing)
+- Both modules share the same VM (`invoapp-vm`)
+- Path-based routing: `/login/` and `/dashboard/`
+- Cost-effective single VM deployment
+- Easy management and monitoring
 
 ### VM Configuration
 
 - **Machine Type**: e2-micro (1 vCPU, 1GB RAM)
 - **OS**: Ubuntu 22.04 LTS
-- **Docker**: Installed automatically (individual deployments)
-- **Nginx**: Reverse proxy for unified deployment
+- **Nginx**: Web server for static file serving
 - **Ports**: 80 (HTTP)
 - **Firewall**: HTTP traffic allowed from anywhere
+- **VM Name**: `invoapp-vm` (shared by both modules)
 
 ### Access Your Deployed Modules
 
-#### Unified Deployment
+#### Shared VM Deployment
 
 ```
-🎉 Unified Modules deployed successfully!
+🎉 Login Module deployed successfully!
 =============================================
 📋 Deployment Details:
-  • VM Instance: unified-modules-vm
+  • VM Instance: invoapp-vm
   • Zone: us-central1-a
   • External IP: 34.56.155.203
 
@@ -250,18 +225,7 @@ docker run -p 3002:80 dashboard-module:latest
   • Login Module: http://34.56.155.203/login/
   • Dashboard Module: http://34.56.155.203/dashboard/
   • Health Check: http://34.56.155.203/health
-  • Root (redirects to login): http://34.56.155.203
-```
-
-#### Individual Deployments
-
-```
-🎉 Login Module deployed successfully!
-=============================================
-📋 Deployment Details:
-  • VM Instance: login-module-vm
-  • External IP: 34.63.23.114
-  • Application: http://34.63.23.114
+  • Root (redirects based on last deployed module): http://34.56.155.203
 ```
 
 ## Path-based Routing Configuration
@@ -488,8 +452,8 @@ docker ps
 
 ### Cost Comparison
 
-- **Unified Deployment**: 1 VM = ~$6/month
-- **Individual Deployments**: 2 VMs = ~$12/month
+- **Shared VM Deployment**: 1 VM = ~$6/month
+- **Separate VMs**: 2 VMs = ~$12/month
 
 ### Auto-shutdown
 
